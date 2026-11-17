@@ -11,7 +11,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
-import { Trash2, Search } from "lucide-react";
+import { Trash2, Search, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import Link from "next/link";
 
 interface Recipe {
   id: string;
@@ -68,16 +69,20 @@ export default function HomePage() {
     if (!confirm(`Biztosan törlöd ezt a receptet: ${recipe.name}?`)) return;
 
     try {
-      // 1. Kép törlése Cloudinary-ból (ha van mentett public_id / deleteUrl)
-      if (recipe.deleteUrl) {
-        await fetch("/api/deleteImage", {
+      // Csak akkor hívjuk a Cloudinary API-t, ha van deleteUrl és az NEM egy régi ImgBB http link
+      if (recipe.deleteUrl && !recipe.deleteUrl.startsWith("http")) {
+        const res = await fetch("/api/deleteImage", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ public_id: recipe.deleteUrl }),
         });
+
+        if (!res.ok) {
+          console.warn("A képet nem sikerült törölni Cloudinary-ból, de a recept törlődik.");
+        }
       }
 
-      // 2. Dokumentum törlése Firestore-ból
+      // Dokumentum törlése Firestore-ból (régi és új receptnél is lefut)
       await deleteDoc(doc(db, "recipes", recipe.id));
       toast.success("Recept sikeresen törölve!");
     } catch (error) {
@@ -85,6 +90,7 @@ export default function HomePage() {
       toast.error("Nem sikerült törölni a receptet.");
     }
   };
+
 
   const filteredRecipes = recipes.filter(
     (r) =>
@@ -149,7 +155,13 @@ export default function HomePage() {
               </CardContent>
 
               {user?.uid === recipe.uid && (
-                <CardFooter className="border-t pt-4 justify-end">
+                <CardFooter className="border-t pt-4 justify-end gap-2">
+                  <Link href={`/editrecipe/${recipe.id}`}>
+                    <Button variant="outline" size="sm">
+                      <Pencil className="h-4 w-4 mr-1" />
+                      Szerkesztés
+                    </Button>
+                  </Link>
                   <Button
                     variant="destructive"
                     size="sm"

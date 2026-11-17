@@ -12,6 +12,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
+import { uploadImage, deleteImage } from "@/lib/cloudinaryUtils";
 import { Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -90,15 +91,6 @@ export function RecipeForm({ recipeId }: RecipeFormProps) {
     setPreview(URL.createObjectURL(selected));
   };
 
-  const convertToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = (error) => reject(error);
-    });
-  };
-
   const handleChangeIngredient = (index: number, value: string) => {
     const updated = [...ingredients];
     updated[index] = value;
@@ -129,25 +121,14 @@ export function RecipeForm({ recipeId }: RecipeFormProps) {
       let deleteUrl = existingDeleteUrl;
 
       if (file) {
-        const base64Image = await convertToBase64(file);
-        const res = await fetch("/api/uploadImage", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ image: base64Image }),
-        });
-
-        const imgData = await res.json();
-        if (!res.ok) throw new Error(imgData.serverMsg || "Képfeltöltési hiba");
+        const imgData = await uploadImage(file);
+        if (!imgData) throw new Error("Képfeltöltési hiba");
 
         imageUrl = imgData.url;
         deleteUrl = imgData.public_id;
 
         if (existingDeleteUrl && !existingDeleteUrl.startsWith("http")) {
-          await fetch("/api/deleteImage", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ public_id: existingDeleteUrl }),
-          });
+          await deleteImage(existingDeleteUrl);
         }
       }
 

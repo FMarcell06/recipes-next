@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
   collection,
   onSnapshot,
@@ -11,6 +12,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
+import { deleteImage } from "@/lib/cloudinaryUtils";
 import { Trash2, Search, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
@@ -23,7 +25,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import Link from "next/link";
 
 interface Recipe {
   id: string;
@@ -44,8 +45,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-  const q = query(collection(db, "recipes"), orderBy("timestamp", "desc"));
-
+    const q = query(collection(db, "recipes"), orderBy("timestamp", "desc"));
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
@@ -69,20 +69,10 @@ export default function HomePage() {
     if (!confirm(`Biztosan törlöd ezt a receptet: ${recipe.name}?`)) return;
 
     try {
-      // Csak akkor hívjuk a Cloudinary API-t, ha van deleteUrl és az NEM egy régi ImgBB http link
       if (recipe.deleteUrl && !recipe.deleteUrl.startsWith("http")) {
-        const res = await fetch("/api/deleteImage", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ public_id: recipe.deleteUrl }),
-        });
-
-        if (!res.ok) {
-          console.warn("A képet nem sikerült törölni Cloudinary-ból, de a recept törlődik.");
-        }
+        await deleteImage(recipe.deleteUrl);
       }
 
-      // Dokumentum törlése Firestore-ból (régi és új receptnél is lefut)
       await deleteDoc(doc(db, "recipes", recipe.id));
       toast.success("Recept sikeresen törölve!");
     } catch (error) {
@@ -90,7 +80,6 @@ export default function HomePage() {
       toast.error("Nem sikerült törölni a receptet.");
     }
   };
-
 
   const filteredRecipes = recipes.filter(
     (r) =>
